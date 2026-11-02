@@ -7,7 +7,7 @@ reel (1080×1920) with AI voiceover, in about a minute. Built for salons,
 restaurants, gyms, clinics, and real-estate agents — businesses that need social
 content but can't hire a video person.
 
-🔗 Live: https://reelforge-ten.vercel.app
+🔗 Live: https://reelforge-five-sooty.vercel.app
 
 ## What it does
 
