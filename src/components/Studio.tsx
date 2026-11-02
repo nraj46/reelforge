@@ -4,13 +4,17 @@ import { useEffect, useRef, useState } from "react";
 import ReelPlayer from "./ReelPlayer";
 import {
   generateReel,
+  LANGUAGE_OPTIONS,
   TONE_OPTIONS,
   TYPE_OPTIONS,
   type BusinessType,
+  type Language,
   type Reel,
   type ReelInput,
   type Tone,
 } from "@/lib/reel";
+
+const BRAND_SWATCHES = ["#ec4899", "#f97316", "#22c55e", "#0ea5e9", "#a855f7", "#eab308"];
 
 export default function Studio({
   injected,
@@ -22,15 +26,29 @@ export default function Studio({
   const [type, setType] = useState<BusinessType>("salon");
   const [offer, setOffer] = useState("");
   const [tone, setTone] = useState<Tone>("fun");
+  const [language, setLanguage] = useState<Language>("en");
+  const [voiceMode, setVoiceMode] = useState<"ai" | "record">("ai");
+  const [brandColor, setBrandColor] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [reel, setReel] = useState<Reel | null>(null);
   const [playSignal, setPlaySignal] = useState(0);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
+  // Voice recording (MediaRecorder, everything stays in this browser).
+  const [recordings, setRecordings] = useState<Record<number, string>>({});
+  const [recScene, setRecScene] = useState<number | null>(null);
+  const [recError, setRecError] = useState<string | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recStreamRef = useRef<MediaStream | null>(null);
+  const recChunksRef = useRef<Blob[]>([]);
+
   useEffect(() => {
     if (injected) {
       setReel(injected.reel);
+      setRecordings({});
       setPlaySignal((n) => n + 1);
       setCopied(false);
     }
@@ -43,13 +61,68 @@ export default function Studio({
       return;
     }
     setError(null);
-    const input: ReelInput = { businessName, type, offer, tone };
+    const input: ReelInput = {
+      businessName,
+      type,
+      offer,
+      tone,
+      language,
+      brand: { logoUrl, photos: photoUrls, color: brandColor },
+    };
     setReel(generateReel(input));
+    setRecordings({});
     setPlaySignal((n) => n + 1);
     setCopied(false);
     requestAnimationFrame(() => {
       playerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
+  };
+
+  const onLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (f) setLogoUrl(URL.createObjectURL(f));
+  };
+
+  const onPhotosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []).slice(0, 3);
+    if (files.length) setPhotoUrls(files.map((f) => URL.createObjectURL(f)));
+  };
+
+  const startRecording = async (sceneIdx: number) => {
+    setRecError(null);
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setRecError("Recording isn't supported in this browser — switch back to AI voice.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recStreamRef.current = stream;
+      recChunksRef.current = [];
+      const rec = new MediaRecorder(stream);
+      rec.ondataavailable = (ev) => {
+        if (ev.data.size > 0) recChunksRef.current.push(ev.data);
+      };
+      rec.onstop = () => {
+        const blob = new Blob(recChunksRef.current, {
+          type: rec.mimeType || "audio/webm",
+        });
+        setRecordings((prev) => ({ ...prev, [sceneIdx]: URL.createObjectURL(blob) }));
+        recStreamRef.current?.getTracks().forEach((t) => t.stop());
+        recStreamRef.current = null;
+        setRecScene(null);
+      };
+      recorderRef.current = rec;
+      rec.start();
+      setRecScene(sceneIdx);
+    } catch {
+      setRecError(
+        "Microphone permission was denied. Allow mic access in your browser settings, or switch back to AI voice — your reel still works.",
+      );
+    }
+  };
+
+  const stopRecording = () => {
+    recorderRef.current?.stop();
   };
 
   const copyCaption = async () => {
@@ -139,6 +212,140 @@ export default function Studio({
           </div>
         </div>
 
+        <div className="mt-5 space-y-4">
+          <div>
+            <label className={labelCls} htmlFor="lang">Language</label>
+            <select
+              id="lang"
+              className={inputCls}
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+            >
+              {LANGUAGE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-[11px] text-zinc-500">
+              The script and voiceover are generated in this language.
+            </p>
+          </div>
+
+          <div>
+            <span className={labelCls}>Voice</span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setVoiceMode("ai")}
+                className={`rounded-lg border px-3 py-2.5 text-left transition ${
+                  voiceMode === "ai"
+                    ? "border-fuchsia-400 bg-fuchsia-400/10"
+                    : "border-zinc-700 bg-zinc-900 hover:border-zinc-500"
+                }`}
+              >
+                <span className="block text-sm font-bold text-zinc-100">🤖 AI voice</span>
+                <span className="block text-[11px] text-zinc-400">
+                  Studio voice, any language
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setVoiceMode("record")}
+                className={`rounded-lg border px-3 py-2.5 text-left transition ${
+                  voiceMode === "record"
+                    ? "border-fuchsia-400 bg-fuchsia-400/10"
+                    : "border-zinc-700 bg-zinc-900 hover:border-zinc-500"
+                }`}
+              >
+                <span className="block text-sm font-bold text-zinc-100">🎙️ Record my voice</span>
+                <span className="block text-[11px] text-zinc-400">
+                  Read each line yourself
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-4">
+            <span className={labelCls}>Brand kit (optional)</span>
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-xs text-zinc-400">Color</span>
+              {BRAND_SWATCHES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`Brand color ${c}`}
+                  onClick={() => setBrandColor(c)}
+                  className={`h-7 w-7 rounded-full border-2 transition ${
+                    brandColor === c ? "scale-110 border-white" : "border-transparent"
+                  }`}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+              <input
+                type="color"
+                aria-label="Custom brand color"
+                value={brandColor ?? "#ec4899"}
+                onChange={(e) => setBrandColor(e.target.value)}
+                className="h-7 w-9 cursor-pointer rounded border border-zinc-700 bg-zinc-900"
+              />
+              {brandColor && (
+                <button
+                  type="button"
+                  onClick={() => setBrandColor(null)}
+                  className="text-[11px] font-semibold text-zinc-400 underline hover:text-zinc-200"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-zinc-400" htmlFor="logo">
+                  Logo
+                </label>
+                <input
+                  id="logo"
+                  type="file"
+                  accept="image/*"
+                  onChange={onLogoChange}
+                  className="w-full text-[11px] text-zinc-400 file:mr-2 file:rounded-full file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-zinc-100"
+                />
+                {logoUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={logoUrl} alt="Logo preview" className="mt-2 h-10 w-10 rounded-lg bg-white object-contain p-0.5" />
+                )}
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold text-zinc-400" htmlFor="photos">
+                  Photos (up to 3)
+                </label>
+                <input
+                  id="photos"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={onPhotosChange}
+                  className="w-full text-[11px] text-zinc-400 file:mr-2 file:rounded-full file:border-0 file:bg-zinc-800 file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-zinc-100"
+                />
+                {photoUrls.length > 0 && (
+                  <div className="mt-2 flex gap-1.5">
+                    {photoUrls.map((u, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img key={i} src={u} alt={`Brand photo ${i + 1}`} className="h-10 w-10 rounded-lg object-cover" />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <p className="mt-2.5 text-[11px] leading-relaxed text-zinc-500">
+              Your logo appears on the first and last scenes, your first photo backs the
+              benefit scene, and your color becomes the reel's accent. Files stay in your
+              browser — nothing is uploaded.
+            </p>
+          </div>
+        </div>
+
         {error && <p className="mt-4 text-sm text-red-300">{error}</p>}
 
         <button
@@ -148,8 +355,9 @@ export default function Studio({
           🎬 Generate my reel
         </button>
         <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
-          Interactive demo: the reel plays live in your browser with a device voice.
-          The full version renders a downloadable 1080×1920 MP4 with studio AI voiceover —
+          Interactive demo: the reel plays live in your browser — AI voice in any
+          language, or your own recorded voice (recordings never leave your browser).
+          The full version renders a downloadable 1080×1920 MP4 with your brand kit —
           downloads and payments launch soon.
         </p>
       </form>
@@ -157,7 +365,73 @@ export default function Studio({
       <div ref={playerRef}>
         {reel ? (
           <div>
-            <ReelPlayer reel={reel} playSignal={playSignal} />
+            <ReelPlayer
+              reel={reel}
+              playSignal={playSignal}
+              voiceMode={voiceMode}
+              recordings={recordings}
+            />
+            {voiceMode === "record" && (
+              <div className="mx-auto mt-5 max-w-[430px] rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+                <h4 className="text-sm font-bold text-zinc-100">🎙️ Record your voice</h4>
+                <p className="mt-1 text-xs leading-relaxed text-zinc-400">
+                  Read each line out loud. Playback uses your recordings scene by scene;
+                  any line you skip falls back to the AI voice. Recordings stay in this
+                  browser — nothing is uploaded.
+                </p>
+                {recError && (
+                  <p className="mt-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs leading-relaxed text-red-200">
+                    {recError}
+                  </p>
+                )}
+                <div className="mt-4 space-y-3">
+                  {reel.scenes.map((scene, i) => (
+                    <div key={i} className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3.5">
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        Scene {i + 1} · {scene.kicker}
+                      </p>
+                      <p className="mt-1.5 text-[15px] font-semibold leading-snug text-zinc-100">
+                        “{scene.voice}”
+                      </p>
+                      <div className="mt-2.5 flex items-center gap-2">
+                        {recScene === i ? (
+                          <button
+                            onClick={stopRecording}
+                            className="rounded-full bg-red-500 px-4 py-1.5 text-xs font-bold text-white transition hover:bg-red-400"
+                          >
+                            ⏹ Stop
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => startRecording(i)}
+                            disabled={recScene !== null}
+                            className="rounded-full bg-zinc-100 px-4 py-1.5 text-xs font-bold text-zinc-900 transition hover:bg-white disabled:opacity-40"
+                          >
+                            {recordings[i] ? "↻ Re-record" : "⏺ Record"}
+                          </button>
+                        )}
+                        {recScene === i && (
+                          <span className="animate-pulse text-xs font-semibold text-red-300">
+                            Recording… read the line now
+                          </span>
+                        )}
+                        {recScene !== i && recordings[i] && (
+                          <span className="text-xs font-semibold text-emerald-300">
+                            ✓ Recorded
+                          </span>
+                        )}
+                        {recScene !== i && !recordings[i] && (
+                          <span className="text-xs text-zinc-500">Not recorded yet</span>
+                        )}
+                      </div>
+                      {recordings[i] && (
+                        <audio controls src={recordings[i]} className="mt-2.5 h-8 w-full" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="mx-auto mt-5 max-w-[430px] rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-zinc-100">📝 Caption &amp; hashtags</h4>

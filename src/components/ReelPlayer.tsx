@@ -13,26 +13,43 @@ function estimateMs(text: string): number {
 export default function ReelPlayer({
   reel,
   playSignal = 0,
+  voiceMode = "ai",
+  recordings = {},
 }: {
   reel: Reel;
   /** Increment to (re)start playback from scene 0 — set from a user gesture where possible. */
   playSignal?: number;
+  /** "ai" = browser speech synthesis; "record" = user's own recordings where available. */
+  voiceMode?: "ai" | "record";
+  /** Scene index -> recorded voiceover object URL (record mode). */
+  recordings?: Record<number, string>;
 }) {
   const [index, setIndex] = useState(0);
   const [status, setStatus] = useState<"idle" | "playing" | "paused" | "done">("idle");
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
   const runId = useRef(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const idRef = useRef(0);
   if (idRef.current === 0) idRef.current = ++instanceCounter;
+
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.onended = null;
+      audioRef.current.onerror = null;
+      audioRef.current = null;
+    }
+  }, []);
 
   const stopSpeech = useCallback(() => {
     runId.current += 1;
     if (timer.current) clearTimeout(timer.current);
+    stopAudio();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-  }, []);
+  }, [stopAudio]);
 
   const speakScene = useCallback(
     (i: number, run: number) => {
@@ -50,16 +67,50 @@ export default function ReelPlayer({
         }
       };
 
+      // Record mode: play the user's own recording for this scene when one exists.
+      const recUrl = voiceMode === "record" ? recordings[i] : undefined;
+      if (recUrl) {
+        let advanced = false;
+        const go = () => {
+          if (!advanced) {
+            advanced = true;
+            advance();
+          }
+        };
+        const audio = new Audio(recUrl);
+        audioRef.current = audio;
+        audio.onended = go;
+        audio.onerror = go;
+        timer.current = setTimeout(go, fallbackMs * 1.6);
+        audio.play().catch(() => {
+          // Autoplay blocked — let the user press Play themselves.
+          if (runId.current === run) {
+            stopSpeech();
+            setStatus("paused");
+            setVoiceNote("Tap ▶ Play to hear your recordings.");
+          }
+        });
+        return;
+      }
+
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         const synth = window.speechSynthesis;
         const utter = new SpeechSynthesisUtterance(scene.voice);
         utter.rate = 1.02;
+        utter.lang = reel.langCode;
         const voices = synth.getVoices();
-        const en =
-          voices.find((v) => v.lang.startsWith("en") && /female|samantha|zira/i.test(v.name)) ||
-          voices.find((v) => v.lang === "en-US") ||
-          voices.find((v) => v.lang.startsWith("en"));
-        if (en) utter.voice = en;
+        const prefix = reel.langCode.split("-")[0].toLowerCase();
+        const match =
+          voices.find((v) => v.lang.toLowerCase().startsWith(prefix)) ||
+          (prefix === "en"
+            ? voices.find((v) => /female|samantha|zira/i.test(v.name))
+            : undefined);
+        if (match) utter.voice = match;
+        if (prefix !== "en" && voices.length > 0 && !match) {
+          setVoiceNote(
+            "No voice for this language on this device — scenes advance on a timer; the script is in your language.",
+          );
+        }
         let advanced = false;
         utter.onend = () => {
           if (!advanced) {
@@ -86,7 +137,7 @@ export default function ReelPlayer({
         timer.current = setTimeout(advance, estimateMs(scene.voice));
       }
     },
-    [reel],
+    [reel, voiceMode, recordings, stopSpeech],
   );
 
   const play = useCallback(
@@ -160,7 +211,31 @@ export default function ReelPlayer({
       {/* Phone frame, 9:16 */}
       <div
         className={`relative mx-auto aspect-[9/16] w-full max-w-[340px] overflow-hidden rounded-[2rem] border border-zinc-700 bg-gradient-to-br ${reel.gradient} shadow-2xl ${reel.glow}`}
+        style={
+          reel.brandColor
+            ? { boxShadow: `0 25px 55px -12px ${reel.brandColor}90` }
+            : undefined
+        }
       >
+        {/* brand accent strip */}
+        {reel.brandColor && (
+          <div
+            className="absolute inset-x-0 top-0 z-30 h-1.5"
+            style={{ backgroundColor: reel.brandColor }}
+          />
+        )}
+        {/* brand photo background on the first benefit scene */}
+        {index === 1 && reel.photoUrl && (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={reel.photoUrl}
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-black/60" />
+          </>
+        )}
         {/* segment bars */}
         <div className="absolute inset-x-4 top-3 z-20 flex gap-1.5">
           {reel.scenes.map((_, i) => (
@@ -177,7 +252,10 @@ export default function ReelPlayer({
         </div>
 
         <div key={index} className="scene-enter absolute inset-0 flex flex-col px-6 pb-8 pt-12">
-          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/80">
+          <p
+            className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/80"
+            style={reel.brandColor ? { color: reel.brandColor } : undefined}
+          >
             {scene.kicker}
           </p>
           <div className="mt-6 text-6xl drop-shadow-lg">{scene.emoji}</div>
@@ -185,11 +263,21 @@ export default function ReelPlayer({
             {scene.headline}
           </h3>
           <p className="mt-4 text-[15px] font-medium leading-snug text-white/90">{scene.sub}</p>
-          <div className="mt-auto">
-            <p className="text-sm font-semibold text-white/95">{reel.businessName}</p>
-            <p className="text-[11px] uppercase tracking-widest text-white/60">
-              {reel.typeLabel} · Made with ReelForge AI
-            </p>
+          <div className="mt-auto flex items-center gap-3">
+            {(index === 0 || index === reel.scenes.length - 1) && reel.logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={reel.logoUrl}
+                alt="Business logo"
+                className="h-11 w-11 shrink-0 rounded-xl bg-white object-contain p-1 shadow"
+              />
+            )}
+            <div>
+              <p className="text-sm font-semibold text-white/95">{reel.businessName}</p>
+              <p className="text-[11px] uppercase tracking-widest text-white/60">
+                {reel.typeLabel} · Made with ReelForge AI
+              </p>
+            </div>
           </div>
         </div>
 
