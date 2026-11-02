@@ -22,20 +22,23 @@ content but can't hire a video person.
   - Voiceover via the browser's built-in speech synthesis, synced to scenes,
     with Play / Pause / Replay and story-style progress bars
   - Auto-generated caption + hashtag block with a copy button
-- **Pre-made samples** — salon, taco restaurant, and gym cards that load canned
-  reels into the same player.
+- **Pre-made samples** — salon, taco restaurant, and gym cards. Each sample is
+  now a **real rendered MP4** (in `public/samples/`) with studio TTS voiceover,
+  rendered with the DailyByte pipeline (PIL-designed 1080×1920 slides → TTS →
+  ffmpeg per-scene assembly, H.264 + AAC, ~30s each). Cards also offer a
+  "Remix in the studio" button that loads the same business into the
+  interactive player.
 
-Honest-demo note: this MVP plays the reel live in the browser. Server-side MP4
-rendering, accounts, and payments are phase 2 (see below). All demo data is
-in-memory only; no external API keys are used.
+Honest-demo note: the interactive studio plays its reel live in the browser;
+the three samples are real server-rendered MP4 files, exactly what the full
+version produces. Accounts and payments are phase 2 (see below). All demo data
+is in-memory only; no external API keys are used.
 
-## Planned pricing (launching soon)
+## Pricing (launching soon) — one simple plan
 
 | Plan | Price | Includes |
 | --- | --- | --- |
-| Pay per reel | $5 / reel | 1 reel, AI voiceover, caption + hashtags |
-| Starter | $29 / mo | 10 reels/mo, all templates |
-| Growth | $59 / mo | 30 reels/mo, per-platform caption packs, priority rendering |
+| Everything | $20 / mo | Up to 30 reels/mo, studio AI voiceover, your own voice or an AI voice in any language, brand kit (logo, colors, photos), custom reels & custom requests, caption + hashtag packs, all templates (new monthly). Fair use: up to 30 reels/month. |
 
 ## Stack
 
@@ -52,5 +55,5 @@ npm run dev   # http://localhost:3000
 
 - Accounts (Clerk) + project storage (Supabase)
 - Server-side render to downloadable 1080×1920 MP4 with studio AI voices
-- Stripe subscriptions ($29/$59) and $5 pay-per-reel checkout
+- Stripe subscription checkout ($20/mo single plan, test mode with dummy bank until launch)
 - Logo/photo upload and brand kits per business

@@ -13,7 +13,7 @@ const STEPS = [
   {
     n: "2",
     title: "AI writes + voices it",
-    body: "ReelForge writes a punchy script for your kind of business, designs the scenes, and records a voiceover — in about a minute.",
+    body: "ReelForge writes a punchy script for your kind of business, designs the scenes, and records the voiceover — your own voice or an AI voice, in your language — in about a minute.",
   },
   {
     n: "3",
@@ -22,36 +22,34 @@ const STEPS = [
   },
 ];
 
-const PLANS = [
-  {
-    name: "Pay per reel",
-    price: "$5",
-    per: "per reel",
-    features: ["No subscription", "1 vertical reel (1080×1920)", "AI voiceover included", "Caption + hashtags"],
-    cta: "Try the demo",
-    highlight: false,
+const SAMPLE_VIDEOS: Record<string, { src: string; poster: string; duration: string }> = {
+  salon: {
+    src: "/samples/sample-salon.mp4",
+    poster: "/samples/sample-salon-poster.jpg",
+    duration: "0:31",
   },
-  {
-    name: "Starter",
-    price: "$29",
-    per: "per month",
-    features: ["10 reels / month", "AI voiceover included", "Caption + hashtags", "All business templates"],
-    cta: "Launching soon",
-    highlight: false,
+  tacos: {
+    src: "/samples/sample-tacos.mp4",
+    poster: "/samples/sample-tacos-poster.jpg",
+    duration: "0:29",
   },
-  {
-    name: "Growth",
-    price: "$59",
-    per: "per month",
-    features: [
-      "30 reels / month",
-      "Caption + hashtag packs tuned per platform",
-      "Priority rendering",
-      "New templates every month",
-    ],
-    cta: "Launching soon",
-    highlight: true,
+  gym: {
+    src: "/samples/sample-gym.mp4",
+    poster: "/samples/sample-gym-poster.jpg",
+    duration: "0:28",
   },
+};
+
+const PLAN_FEATURES = [
+  "Up to 30 promo reels / month",
+  "Custom reels — your photos, your clips, your style",
+  "Brand kit: your logo, colors & photos in every reel",
+  "Custom requests every month — just ask",
+  "Studio AI voiceover on every reel",
+  "Your voice or an AI voice — record your own voiceover, or pick an AI voice",
+  "Any language — English, Spanish, Hindi, Telugu, Vietnamese & more",
+  "Caption + hashtag packs for every post",
+  "All templates — new ones added monthly",
 ];
 
 const FAQS = [
@@ -61,7 +59,7 @@ const FAQS = [
   },
   {
     q: "What exactly do I get?",
-    a: "A vertical 1080×1920 video ready for Instagram Reels, TikTok, and YouTube Shorts, plus a written caption and hashtag set for the post. In this public demo the reel plays live in your browser instead of downloading.",
+    a: "A vertical 1080×1920 video ready for Instagram Reels, TikTok, and YouTube Shorts, plus a written caption and hashtag set for the post. The samples on this page are real rendered videos with studio AI voiceover — exactly what the full version produces. In the interactive studio demo, your reel plays live in your browser instead of downloading.",
   },
   {
     q: "How long does it take?",
@@ -72,8 +70,12 @@ const FAQS = [
     a: "Yes — if you can type one sentence about your offer, you can make a reel. There are no timelines, layers, or export settings to learn.",
   },
   {
+    q: "Can the reel use my own voice and my language?",
+    a: "Yes — record your own voice, or choose an AI voice, in any language. Your customers hear someone who sounds like you, in the language they speak.",
+  },
+  {
     q: "When can I sign up and pay?",
-    a: "Paid plans are launching soon. The pricing on this page is the planned launch pricing — try the interactive demo today, and plans with downloads, accounts, and payments arrive in the next release.",
+    a: "One simple plan: $20/month, everything included — up to 30 reels a month, brand kit, captions and hashtags, all templates. Paid sign-up launches soon at that launch pricing; until then, the interactive demo and the sample reels on this page are free to try.",
   },
 ];
 
@@ -192,38 +194,47 @@ export default function Home() {
             Made with ReelForge
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-sm text-zinc-400">
-            Tap any sample to load it into the studio player and hear it.
+            These are real rendered reels — studio AI voiceover, designed scenes, ready to
+            post. Press play and hear one. Then make your own in the studio above.
           </p>
           <div className="mt-10 grid gap-5 sm:grid-cols-3">
             {SAMPLES.map((s) => {
               const preview = generateReel(s.input);
+              const video = SAMPLE_VIDEOS[s.id];
               return (
-                <button
+                <div
                   key={s.id}
-                  onClick={() => playSample(s.input)}
-                  className="group overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 text-left transition hover:border-zinc-600"
+                  className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/60 transition hover:border-zinc-600"
                 >
-                  <div
-                    className={`relative flex h-44 flex-col justify-between bg-gradient-to-br ${preview.gradient} p-5`}
-                  >
-                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">
-                      {preview.typeLabel}
-                    </span>
-                    <div>
-                      <div className="text-4xl">{preview.emoji}</div>
-                      <p className="mt-2 text-lg font-extrabold leading-tight text-white drop-shadow">
-                        {s.input.offer}
-                      </p>
-                    </div>
-                    <span className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white text-sm text-zinc-900 shadow transition group-hover:scale-110">
-                      ▶
-                    </span>
+                  <div className="relative mx-auto aspect-[9/16] w-full max-w-[320px] bg-black">
+                    <video
+                      className="h-full w-full"
+                      src={video.src}
+                      poster={video.poster}
+                      controls
+                      playsInline
+                      preload="metadata"
+                    />
                   </div>
                   <div className="p-5">
-                    <h3 className="text-sm font-bold text-zinc-50">{s.input.businessName}</h3>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{preview.emoji}</span>
+                      <h3 className="text-sm font-bold text-zinc-50">
+                        {s.input.businessName}
+                      </h3>
+                      <span className="ml-auto text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">
+                        {preview.typeLabel} · {video.duration}
+                      </span>
+                    </div>
                     <p className="mt-1.5 text-sm leading-relaxed text-zinc-400">{s.blurb}</p>
+                    <button
+                      onClick={() => playSample(s.input)}
+                      className="mt-4 w-full rounded-full border border-zinc-600 px-4 py-2 text-xs font-bold text-zinc-100 transition hover:border-fuchsia-400 hover:text-white"
+                    >
+                      🎬 Remix this in the studio
+                    </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
@@ -234,53 +245,43 @@ export default function Home() {
       <section id="pricing" className="scroll-mt-20 border-t border-zinc-900">
         <div className="mx-auto w-full max-w-6xl px-6 py-16">
           <h2 className="text-center text-2xl font-bold tracking-tight sm:text-3xl">
-            Simple pricing
+            One price. <span className="bg-gradient-to-r from-fuchsia-400 to-amber-400 bg-clip-text text-transparent">Everything included.</span>
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-center text-sm text-zinc-400">
-            Cheaper than one boosted post — and it makes the content for you. Planned launch
-            pricing; paid plans launch soon.
+            Less than one haircut — cheaper than a single boosted post. No tiers, no
+            per-reel fees, no surprises.
           </p>
-          <div className="mt-10 grid gap-5 sm:grid-cols-3">
-            {PLANS.map((p) => (
-              <div
-                key={p.name}
-                className={`relative rounded-2xl border p-6 ${
-                  p.highlight
-                    ? "border-fuchsia-400/60 bg-fuchsia-400/[0.06]"
-                    : "border-zinc-800 bg-zinc-900/60"
-                }`}
+          <div className="mx-auto mt-10 max-w-md">
+            <div className="relative rounded-2xl border border-fuchsia-400/60 bg-fuchsia-400/[0.06] p-8">
+              <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-fuchsia-500 to-amber-500 px-3 py-1 text-[11px] font-bold text-white">
+                EVERYTHING INCLUDED
+              </span>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-300">
+                ReelForge — one simple plan
+              </h3>
+              <p className="mt-3">
+                <span className="text-5xl font-extrabold text-zinc-50">$20</span>{" "}
+                <span className="text-sm text-zinc-400">per month</span>
+              </p>
+              <ul className="mt-6 space-y-2.5 text-sm text-zinc-300">
+                {PLAN_FEATURES.map((f) => (
+                  <li key={f} className="flex gap-2">
+                    <span className="text-emerald-400">✓</span> {f}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="#studio"
+                className="mt-7 block rounded-full bg-gradient-to-r from-fuchsia-500 to-amber-500 px-5 py-3 text-center text-sm font-bold text-white transition hover:opacity-90"
               >
-                {p.highlight && (
-                  <span className="absolute -top-3 left-6 rounded-full bg-gradient-to-r from-fuchsia-500 to-amber-500 px-3 py-1 text-[11px] font-bold text-white">
-                    MOST POPULAR
-                  </span>
-                )}
-                <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-300">
-                  {p.name}
-                </h3>
-                <p className="mt-3">
-                  <span className="text-4xl font-extrabold text-zinc-50">{p.price}</span>{" "}
-                  <span className="text-sm text-zinc-400">{p.per}</span>
-                </p>
-                <ul className="mt-5 space-y-2 text-sm text-zinc-300">
-                  {p.features.map((f) => (
-                    <li key={f} className="flex gap-2">
-                      <span className="text-emerald-400">✓</span> {f}
-                    </li>
-                  ))}
-                </ul>
-                <a
-                  href="#studio"
-                  className={`mt-6 block rounded-full px-5 py-2.5 text-center text-sm font-bold transition ${
-                    p.highlight
-                      ? "bg-gradient-to-r from-fuchsia-500 to-amber-500 text-white hover:opacity-90"
-                      : "border border-zinc-600 text-zinc-100 hover:border-zinc-400"
-                  }`}
-                >
-                  {p.cta}
-                </a>
-              </div>
-            ))}
+                Try the demo free
+              </a>
+              <p className="mt-4 text-center text-[11px] leading-relaxed text-zinc-500">
+                Launch pricing. Fair use: up to 30 reels/month, custom requests
+                included. Paid plans with downloads, accounts, and payments arrive
+                with the full launch — the demo above is free today.
+              </p>
+            </div>
           </div>
         </div>
       </section>
