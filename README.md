@@ -34,6 +34,26 @@ the three samples are real server-rendered MP4 files, exactly what the full
 version produces. Accounts and payments are phase 2 (see below). All demo data
 is in-memory only; no external API keys are used.
 
+## Fast decision layer (the router)
+
+Before the studio generates anything, every request passes through a **local
+decision router** (`src/lib/router.ts`) — a small, fast layer in front of the
+generation step, the same pattern as **Sarvam AI's Prism**, a decision model
+that answers in ~44 ms so the big model only runs when it has to.
+
+The router classifies the request instantly with local rules and keyword
+scoring — business category (auto-detected from the name + offer when the type
+is "Other"), offer intent (percentage discount, BOGO, freebie, fixed-price,
+launch, general), scene template, caption style, and hashtag seeds — and
+reports each decision in the studio with its real measured time (typically
+well under a millisecond) and an **"AI calls avoided"** session counter: every
+decision the router answers locally is one the AI never has to make.
+
+Honest-demo note: this router is rules-based and runs entirely in the browser
+— no network call, no AI call. The production version swaps the rules for a
+small hosted decision model; the architecture (fast router in front, heavy
+generation behind) stays the same.
+
 ## Pricing (launching soon) — one simple plan
 
 | Plan | Price | Includes |

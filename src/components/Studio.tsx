@@ -13,6 +13,7 @@ import {
   type ReelInput,
   type Tone,
 } from "@/lib/reel";
+import { routeRequest, type RouteResult } from "@/lib/router";
 
 const BRAND_SWATCHES = ["#ec4899", "#f97316", "#22c55e", "#0ea5e9", "#a855f7", "#eab308"];
 
@@ -37,6 +38,14 @@ export default function Studio({
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
+  // Decision router state: the latest routing pass, the session counter of
+  // AI calls the router answered locally, and a short session log.
+  const [route, setRoute] = useState<RouteResult | null>(null);
+  const [callsAvoided, setCallsAvoided] = useState(0);
+  const [routeLog, setRouteLog] = useState<
+    { business: string; summary: string; ms: number; saved: number }[]
+  >([]);
+
   // Voice recording (MediaRecorder, everything stays in this browser).
   const [recordings, setRecordings] = useState<Record<number, string>>({});
   const [recScene, setRecScene] = useState<number | null>(null);
@@ -48,6 +57,7 @@ export default function Studio({
   useEffect(() => {
     if (injected) {
       setReel(injected.reel);
+      setRoute(null);
       setRecordings({});
       setPlaySignal((n) => n + 1);
       setCopied(false);
@@ -61,13 +71,38 @@ export default function Studio({
       return;
     }
     setError(null);
+    // Fast local decision router runs first: it classifies the request and
+    // picks the template, caption style, and hashtag seeds with local rules
+    // — no AI call — before the reel is generated.
+    const routed = routeRequest({
+      businessName,
+      selectedType: type,
+      offer,
+      tone,
+      language,
+    });
+    setRoute(routed);
+    setCallsAvoided((n) => n + routed.callsAvoided);
+    setRouteLog((prev) =>
+      [
+        {
+          business: businessName.trim(),
+          summary: `${routed.categoryLabel.split(" /")[0]} · ${routed.offerIntentLabel} · ${routed.toneLabel} · ${routed.languageLabel}`,
+          ms: routed.durationMs,
+          saved: routed.callsAvoided,
+        },
+        ...prev,
+      ].slice(0, 5),
+    );
     const input: ReelInput = {
       businessName,
-      type,
+      type: routed.category,
       offer,
       tone,
       language,
       brand: { logoUrl, photos: photoUrls, color: brandColor },
+      captionAngle: routed.captionAngle || undefined,
+      extraHashtags: routed.hashtagSeeds,
     };
     setReel(generateReel(input));
     setRecordings({});
@@ -178,6 +213,10 @@ export default function Studio({
                 </option>
               ))}
             </select>
+            <p className="mt-1.5 text-[11px] text-zinc-500">
+              Not sure? Pick “Other local business” — the decision router will
+              detect your category from your name and offer.
+            </p>
           </div>
           <div>
             <label className={labelCls} htmlFor="offer">Your offer</label>
@@ -354,6 +393,9 @@ export default function Studio({
         >
           🎬 Generate my reel
         </button>
+        <p className="mt-3 text-center text-[11px] font-semibold text-emerald-300/90">
+          ⚡ Decision router on: AI calls avoided this session: {callsAvoided}
+        </p>
         <p className="mt-3 text-center text-[11px] leading-relaxed text-zinc-500">
           Interactive demo: the reel plays live in your browser — AI voice in any
           language, or your own recorded voice (recordings never leave your browser).
@@ -365,6 +407,66 @@ export default function Studio({
       <div ref={playerRef}>
         {reel ? (
           <div>
+            {route && (
+              <div className="mx-auto mb-5 max-w-[430px] rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h4 className="text-sm font-bold text-zinc-100">
+                    ⚡ Decision router
+                  </h4>
+                  <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[11px] font-bold text-emerald-300">
+                    AI calls avoided: {callsAvoided}
+                  </span>
+                </div>
+                <p className="mt-1.5 text-xs leading-relaxed text-zinc-400">
+                  Routed locally in{" "}
+                  <strong className="text-emerald-300">
+                    {route.durationMs.toFixed(2)} ms
+                  </strong>{" "}
+                  — no AI call. A fast decision layer (rules + keyword scoring)
+                  classified this request before generation, the same pattern as
+                  Sarvam Prism&apos;s 44&nbsp;ms decision model.
+                </p>
+                <dl className="mt-3 space-y-2">
+                  {route.decisions.map((d) => (
+                    <div key={d.kind} className="text-xs leading-relaxed">
+                      <dt className="inline font-bold uppercase tracking-wider text-zinc-500">
+                        {d.kind}:{" "}
+                      </dt>
+                      <dd className="inline text-zinc-200">{d.value}</dd>
+                      <span className="block text-[11px] text-zinc-500">
+                        {d.detail}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="text-xs leading-relaxed">
+                    <dt className="inline font-bold uppercase tracking-wider text-zinc-500">
+                      Tone · Language:{" "}
+                    </dt>
+                    <dd className="inline text-zinc-200">
+                      {route.toneLabel} · {route.languageLabel}
+                    </dd>
+                  </div>
+                </dl>
+                {routeLog.length > 0 && (
+                  <div className="mt-4 border-t border-emerald-500/20 pt-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Session log
+                    </p>
+                    <ul className="mt-1.5 space-y-1">
+                      {routeLog.map((entry, i) => (
+                        <li key={i} className="text-[11px] leading-relaxed text-zinc-400">
+                          <span className="font-semibold text-zinc-200">
+                            {entry.business}
+                          </span>{" "}
+                          — {entry.summary} · {entry.ms.toFixed(2)} ms · +
+                          {entry.saved} calls avoided
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             <ReelPlayer
               reel={reel}
               playSignal={playSignal}

@@ -31,6 +31,10 @@ export interface ReelInput {
   tone: Tone;
   language?: Language;
   brand?: BrandKit;
+  /** Optional caption opening line supplied by the decision router. */
+  captionAngle?: string;
+  /** Optional extra hashtag seeds supplied by the decision router. */
+  extraHashtags?: string[];
 }
 
 export interface Scene {
@@ -513,7 +517,7 @@ export function generateReel(input: ReelInput): Reel {
   }
 
   const caption =
-    `${cfg.emoji} ${input.offer.trim()} at ${name}! ${cfg.cta} — offer available for a limited time. ` +
+    `${input.captionAngle ? `${input.captionAngle} ` : ""}${cfg.emoji} ${input.offer.trim()} at ${name}! ${cfg.cta} — offer available for a limited time. ` +
     `Tag someone who needs this 👇`;
 
   return {
@@ -525,12 +529,15 @@ export function generateReel(input: ReelInput): Reel {
     scenes,
     caption,
     hashtags: [
-      ...cfg.hashtags,
-      "#SmallBusiness",
-      "#LocalBusiness",
-      "#Promo",
-      "#Reels",
-      "#DailyByte",
+      ...new Set([
+        ...cfg.hashtags,
+        ...(input.extraHashtags ?? []),
+        "#SmallBusiness",
+        "#LocalBusiness",
+        "#Promo",
+        "#Reels",
+        "#DailyByte",
+      ]),
     ],
     langCode: LANGUAGE_OPTIONS.find((l) => l.value === lang)?.code ?? "en-US",
     brandColor: input.brand?.color ?? null,
