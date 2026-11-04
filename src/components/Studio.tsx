@@ -14,6 +14,7 @@ import {
   type Tone,
 } from "@/lib/reel";
 import { routeRequest, type RouteResult } from "@/lib/router";
+import RefineChat from "./RefineChat";
 
 const BRAND_SWATCHES = ["#ec4899", "#f97316", "#22c55e", "#0ea5e9", "#a855f7", "#eab308"];
 
@@ -35,6 +36,7 @@ export default function Studio({
   const [reel, setReel] = useState<Reel | null>(null);
   const [playSignal, setPlaySignal] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [captionOverride, setCaptionOverride] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +60,7 @@ export default function Studio({
     if (injected) {
       setReel(injected.reel);
       setRoute(null);
+      setCaptionOverride(null);
       setRecordings({});
       setPlaySignal((n) => n + 1);
       setCopied(false);
@@ -105,6 +108,7 @@ export default function Studio({
       extraHashtags: routed.hashtagSeeds,
     };
     setReel(generateReel(input));
+    setCaptionOverride(null);
     setRecordings({});
     setPlaySignal((n) => n + 1);
     setCopied(false);
@@ -162,7 +166,7 @@ export default function Studio({
 
   const copyCaption = async () => {
     if (!reel) return;
-    const text = `${reel.caption}\n\n${reel.hashtags.join(" ")}`;
+    const text = `${captionOverride ?? reel.caption}\n\n${reel.hashtags.join(" ")}`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -408,7 +412,10 @@ export default function Studio({
         {reel ? (
           <div>
             {route && (
-              <div className="mx-auto mb-5 max-w-[430px] rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+              <div
+                data-testid="router-readout"
+                className="mx-auto mb-5 max-w-[430px] rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-5"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <h4 className="text-sm font-bold text-zinc-100">
                     ⚡ Decision router
@@ -544,11 +551,49 @@ export default function Studio({
                   {copied ? "✓ Copied!" : "Copy"}
                 </button>
               </div>
-              <p className="mt-3 text-sm leading-relaxed text-zinc-300">{reel.caption}</p>
+              {captionOverride ? (
+                <>
+                  <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+                    {captionOverride}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-emerald-300">
+                    Custom caption from the refine chat ·{" "}
+                    <button
+                      type="button"
+                      onClick={() => setCaptionOverride(null)}
+                      className="font-semibold underline hover:text-emerald-200"
+                    >
+                      Reset to original
+                    </button>
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 text-sm leading-relaxed text-zinc-300">
+                  {reel.caption}
+                </p>
+              )}
               <p className="mt-2 text-sm leading-relaxed text-fuchsia-300">
                 {reel.hashtags.join(" ")}
               </p>
             </div>
+            <RefineChat
+              key={playSignal}
+              context={{
+                businessName: reel.businessName,
+                typeLabel: reel.typeLabel,
+                offer,
+                tone,
+                language:
+                  LANGUAGE_OPTIONS.find((l) => l.value === language)?.label ??
+                  "English",
+                caption: captionOverride ?? reel.caption,
+                hashtags: reel.hashtags,
+              }}
+              onApplyCaption={(c) => {
+                setCaptionOverride(c);
+                setCopied(false);
+              }}
+            />
           </div>
         ) : (
           <div className="flex h-full min-h-[380px] flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 bg-zinc-900/30 px-8 text-center">
